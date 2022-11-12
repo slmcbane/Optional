@@ -182,8 +182,13 @@ struct Optional
     constexpr Optional &operator=(const Optional &) requires Optional_detail::TriviallyCopyable<T>
     = default;
 
-    constexpr Optional &operator=(const Optional &other) requires(!Optional_detail::TriviallyCopyable<T>)
-    {
+    // clang-format off
+    constexpr Optional &operator=(const Optional &other) 
+        noexcept(std::is_nothrow_copy_constructible_v<T> and std::is_nothrow_copy_assignable_v<T>)
+        requires(!Optional_detail::TriviallyCopyable<T>
+                 and std::is_copy_constructible_v<T>
+                 and std::is_copy_assignable_v<T>)
+    { // clang-format on
         if (m_engaged)
             if (other.m_engaged)
                 m_payload.x = *other;
@@ -197,8 +202,13 @@ struct Optional
     constexpr Optional &operator=(Optional &&) requires Optional_detail::TriviallyMovable<T>
     = default;
 
-    constexpr Optional &operator=(Optional &&other) requires(!Optional_detail::TriviallyMovable<T>)
-    {
+    // clang-format off
+    constexpr Optional &operator=(Optional &&other)
+        noexcept(std::is_nothrow_move_assignable_v<T> and std::is_nothrow_move_constructible_v<T>)
+        requires(!Optional_detail::TriviallyMovable<T>
+                 and std::is_move_assignable_v<T>
+                 and std::is_move_constructible_v<T>)
+    { //clang-format on
         if (m_engaged)
             if (other.m_engaged)
                 m_payload.x = std::move(*other);
@@ -209,19 +219,27 @@ struct Optional
         return *this;
     }
 
+    // clang-format off
     template <class U = T>
     constexpr Optional &operator=(U &&value)
-    {
+        noexcept(std::is_nothrow_assignable_v<T, U &&> and std::is_nothrow_constructible_v<T, U &&>)
+        requires(std::is_assignable_v<T, U &&> and std::is_constructible_v<T, U &&>)
+    { // clang-format on
         if (m_engaged)
             m_payload.x = static_cast<U &&>(value);
         else
             unchecked_construct(static_cast<U &&>(value));
     }
 
+    // clang-format off
     template <class U>
     constexpr Optional &
-    operator=(const Optional<U> &other) requires(!Optional_detail::ConvertibleOrAssignableFrom<T, U>)
-    {
+    operator=(const Optional<U> &other)
+        noexcept(std::is_nothrow_assignable_v<T, const U&> and std::is_nothrow_constructible_v<T, const U&>)
+        requires(!Optional_detail::ConvertibleOrAssignableFrom<T, U>
+                 and std::is_constructible_v<T, const U&>
+                 and std::is_assignable_v<T, const U&>)
+    { // clang-format on
         if (m_engaged)
             if (other.m_engaged)
                 m_payload.x = *other;
@@ -232,10 +250,14 @@ struct Optional
         return *this;
     }
 
+    // clang-format off
     template <class U>
-    constexpr Optional &
-    operator=(Optional<U> &&other) requires(!Optional_detail::ConvertibleOrAssignableFrom<T, U>)
-    {
+    constexpr Optional &operator=(Optional<U> &&other)
+        noexcept(std::is_nothrow_assignable_v<T, U &&> and std::is_nothrow_constructible_v<T, U &&>)
+        requires(!Optional_detail::ConvertibleOrAssignableFrom<T, U>
+                 and std::is_constructible_v<T, U &&>
+                 and std::is_assignable_v<T, U &&>)
+    { // clang-format on
         if (m_engaged)
             if (other.m_engaged)
                 m_payload.x = static_cast<U &&>(*other);
@@ -321,7 +343,8 @@ struct Optional
     }
 
     template <class... Args>
-    constexpr T &emplace(Args &&...args) noexcept(std::is_nothrow_constructible_v<T, Args &&...>)
+    constexpr T &emplace(Args &&...args) noexcept(
+        std::is_nothrow_constructible_v<T, Args &&...>) requires std::is_constructible_v<T, Args &&...>
     {
         if (m_engaged)
             unchecked_reset();
@@ -336,9 +359,12 @@ struct Optional
 
     bool m_engaged;
 
+    // clang-format off
     template <class... Args>
     void unchecked_construct(Args &&...v)
-    {
+        noexcept(std::is_nothrow_constructible_v<T, Args &&...>)
+        requires std::is_constructible_v<T, Args&&...>
+    { // clang-format on
         std::construct_at(&m_payload.x, static_cast<Args &&>(v)...);
         m_engaged = true;
     }
