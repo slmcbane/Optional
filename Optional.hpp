@@ -8,12 +8,6 @@
 #include <tuple>
 #include <type_traits>
 
-#ifdef ALTERNATE_ASSERT_MACRO
-#define SLM_ASSERT ALTERNATE_ASSERT_MACRO
-#else
-#define SLM_ASSERT assert
-#endif // ALTERNATE_ASSERT_MACRO
-
 namespace slm
 {
 
@@ -252,6 +246,88 @@ struct Optional
         return *this;
     }
 
+    constexpr const T *operator->() const noexcept
+    {
+        assert(m_engaged);
+        return &m_payload.x;
+    }
+
+    constexpr T *operator->() noexcept
+    {
+        assert(m_engaged);
+        return &m_payload.x;
+    }
+
+    constexpr const T &operator*() const &noexcept
+    {
+        assert(m_engaged);
+        return m_payload.x;
+    }
+
+    constexpr T &operator*() &noexcept
+    {
+        assert(m_engaged);
+        return m_payload.x;
+    }
+
+    constexpr const T &&operator*() const &&noexcept
+    {
+        assert(m_engaged);
+        return m_payload.x;
+    }
+
+    constexpr T &&operator*() &&noexcept
+    {
+        assert(m_engaged);
+        return m_payload.x;
+    }
+
+    constexpr explicit operator bool() const noexcept
+    {
+        assert(m_engaged);
+        return m_engaged;
+    }
+
+    constexpr bool has_value() const noexcept { return m_engaged; }
+
+    constexpr void swap(Optional &other) noexcept(
+        std::is_nothrow_move_constructible_v<T>
+            and std::is_nothrow_swappable_v<T>) requires(std::is_move_constructible_v<T>)
+    {
+        using std::swap;
+        if (m_engaged)
+        {
+            if (other.m_engaged)
+            {
+                swap(**this, *other);
+            }
+            else
+            {
+                other.unchecked_construct(static_cast<T &&>(m_payload.x));
+                unchecked_reset();
+            }
+        }
+        else if (other.m_engaged)
+        {
+            unchecked_construct(static_cast<T &&>(other.m_payload.x));
+            other.unchecked_reset();
+        }
+    }
+
+    constexpr void reset() noexcept
+    {
+        if (m_engaged)
+            unchecked_reset();
+    }
+
+    template <class... Args>
+    constexpr T &emplace(Args &&...args) noexcept(std::is_nothrow_constructible_v<T, Args &&...>)
+    {
+        if (m_engaged)
+            unchecked_reset();
+        unchecked_construct(static_cast<Args &&>(args)...);
+    }
+
   private:
     union Payload
     {
@@ -260,10 +336,10 @@ struct Optional
 
     bool m_engaged;
 
-    template <class U>
-    void unchecked_construct(U &&v)
+    template <class... Args>
+    void unchecked_construct(Args &&...v)
     {
-        std::construct_at(&m_payload.x, static_cast<U &&>(v));
+        std::construct_at(&m_payload.x, static_cast<Args &&>(v)...);
         m_engaged = true;
     }
 
@@ -277,6 +353,6 @@ struct Optional
 
 } // namespace slm
 
-#undef SLM_ASSERT
+#undef assert
 
 #endif // SEANS_OPTIONAL_HPP
