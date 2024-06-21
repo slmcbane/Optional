@@ -567,24 +567,10 @@ operator==(const Optional<T>& a, const None&) noexcept
 }
 
 template<class T>
-inline constexpr bool
-operator==(const None&, const Optional<T>& a) noexcept
-{
-  return !a;
-}
-
-template<class T>
 inline constexpr std::strong_ordering
 operator<=>(const Optional<T>& a, const None&) noexcept
 {
   return a ? std::strong_ordering::greater : std::strong_ordering::equivalent;
-}
-
-template<class T>
-inline constexpr std::strong_ordering
-operator<=>(const None&, const Optional<T>& a) noexcept
-{
-  return a ? std::strong_ordering::less : std::strong_ordering::equivalent;
 }
 
 template<class T, std::equality_comparable_with<T> U>
@@ -592,13 +578,6 @@ inline constexpr bool
 operator==(const Optional<T>& a, const U& b) noexcept
 {
   return a && *a == b;
-}
-
-template<class T, std::equality_comparable_with<T> U>
-inline constexpr bool
-operator==(const T& a, const Optional<U>& b) noexcept
-{
-  return b && a == *b;
 }
 
 template<class T, std::three_way_comparable_with<T> U>
@@ -609,16 +588,6 @@ operator<=>(const Optional<T>& a, const U& b) noexcept
     return *a <=> b;
   }
   return std::compare_three_way_result_t<T, U>::less;
-}
-
-template<class T, std::three_way_comparable_with<T> U>
-inline constexpr std::compare_three_way_result_t<T, U>
-operator<=>(const T& a, const Optional<U>& b) noexcept
-{
-  if (b) {
-    return a <=> *b;
-  }
-  return std::compare_three_way_result_t<T, U>::greater;
 }
 
 } // namespace slm
