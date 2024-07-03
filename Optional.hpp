@@ -119,6 +119,9 @@ constexpr inline bool is_optional = false;
 template<class T>
 constexpr inline bool is_optional<Optional<T>> = true;
 
+template<class T>
+concept NotOptional = !is_optional<std::remove_cvref_t<T>>;
+
 template<class F, class T>
 using bare_result_type = std::remove_cvref_t<std::invoke_result_t<F, T>>;
 
@@ -664,14 +667,16 @@ operator<=>(const Optional<T>& a, const NoneType&) noexcept
   return a ? std::strong_ordering::greater : std::strong_ordering::equivalent;
 }
 
-template<class T, std::equality_comparable_with<T> U>
+template<class T, optional_detail::NotOptional U>
+  requires std::equality_comparable_with<T, U>
 inline constexpr bool
 operator==(const Optional<T>& a, const U& b) noexcept
 {
   return a && *a == b;
 }
 
-template<class T, std::three_way_comparable_with<T> U>
+template<class T, optional_detail::NotOptional U>
+  requires std::three_way_comparable_with<T, U>
 inline constexpr std::compare_three_way_result_t<T, U>
 operator<=>(const Optional<T>& a, const U& b) noexcept
 {

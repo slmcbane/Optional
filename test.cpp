@@ -105,6 +105,8 @@ constexpr_test()
   static_assert(*optional == 10);
 
   static_assert(optional.transform([](int arg) -> double { return arg * 2; }).value() == 20);
+
+  static_assert(optional.or_else([]() -> Optional<int> { return Some(2); }) == optional);
 }
 
 int
