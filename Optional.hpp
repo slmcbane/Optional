@@ -275,6 +275,19 @@ public:
     }
   }
 
+  template<class U>
+  constexpr Optional& operator=(Some<U&&> x) noexcept(std::is_nothrow_constructible_v<T, U&&> &&
+                                                      std::is_nothrow_assignable_v<T, U&&>)
+    requires(std::is_assignable_v<T, U &&> && std::is_constructible_v<T, U &&>)
+  {
+    if (m_engaged) {
+      m_payload = x.unwrap();
+    } else {
+      std::construct_at(&m_payload, x.unwrap());
+      m_engaged = true;
+    }
+  }
+
   constexpr const T* operator->() const noexcept
   {
     CHECK(m_engaged, "dereferencing disengaged Optional");
