@@ -504,6 +504,11 @@ private:
   };
   bool m_engaged{ false };
 
+  template<class U>
+    requires(!std::is_same_v<U, NoneType> && !std::is_reference_v<U> &&
+             !optional_detail::is_some<T>)
+  friend class Optional;
+
   template<class F, class U>
   constexpr explicit Optional(F&& f, U&& u) noexcept(std::is_nothrow_invocable_v<F, U&&>)
     requires std::is_invocable_r_v<T, F, U>
