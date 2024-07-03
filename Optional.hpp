@@ -140,19 +140,15 @@ template<class T>
            !optional_detail::is_some<T>)
 class Optional
 {
+public:
   constexpr Optional() noexcept = default;
   constexpr Optional(NoneType) noexcept {}
 
-  constexpr Optional(const Optional&)
+  constexpr Optional(const Optional&) noexcept
     requires std::is_trivially_copy_constructible_v<T>
   = default;
 
-  constexpr Optional(const Optional&)
-    requires(!std::is_copy_constructible_v<T>)
-  = delete;
-
   constexpr Optional(const Optional& other) noexcept(std::is_nothrow_copy_constructible_v<T>)
-    requires(std::is_copy_constructible_v<T> && !std::is_trivially_copy_constructible_v<T>)
   {
     if (other.m_engaged) {
       std::construct_at(&m_payload, other.m_payload);
@@ -164,12 +160,7 @@ class Optional
     requires std::is_trivially_move_constructible_v<T>
   = default;
 
-  constexpr Optional(Optional&&)
-    requires(!std::is_move_constructible_v<T>)
-  = delete;
-
   constexpr Optional(Optional&& other) noexcept(std::is_nothrow_move_constructible_v<T>)
-    requires(std::is_move_constructible_v<T> && !std::is_trivially_move_constructible_v<T>)
   {
     if (other.m_engaged) {
       std::construct_at(&m_payload, std::move(other.m_payload));
@@ -228,14 +219,9 @@ class Optional
     requires optional_detail::trivially_copy_assignable<T>
   = default;
 
-  constexpr Optional& operator=(const Optional& other)
-    requires(!(std::is_copy_constructible_v<T> && std::is_copy_assignable_v<T>))
-  = delete;
-
   constexpr Optional& operator=(const Optional& other) noexcept(
-    std::is_nothrow_copy_constructible_v<T>&& std::is_nothrow_copy_assignable_v<T>&&
-      std::is_nothrow_destructible_v<T>)
-    requires(!optional_detail::trivially_copy_assignable<T>)
+    std::is_nothrow_copy_constructible_v<T> && std::is_nothrow_copy_assignable_v<T> &&
+    std::is_nothrow_destructible_v<T>)
   {
     if (m_engaged && other.m_engaged) {
       m_payload = other.m_payload;
@@ -253,13 +239,9 @@ class Optional
     requires optional_detail::trivially_move_assignable<T>
   = default;
 
-  constexpr Optional& operator=(Optional&&)
-    requires(!(std::is_move_assignable_v<T> && std::is_move_constructible_v<T>))
-  = delete;
-
   constexpr Optional& operator=(Optional&& other) noexcept(
-    std::is_nothrow_move_assignable_v<T>&& std::is_nothrow_move_constructible_v<T>&&
-      std::is_nothrow_destructible_v<T>)
+    std::is_nothrow_move_assignable_v<T> && std::is_nothrow_move_constructible_v<T> &&
+    std::is_nothrow_destructible_v<T>)
     requires(!optional_detail::trivially_move_assignable<T>)
   {
     if (m_engaged && other.m_engaged) {
@@ -276,7 +258,7 @@ class Optional
 
   template<class U>
   constexpr Optional& operator=(Some<const U&> x) noexcept(
-    std::is_nothrow_constructible_v<T, const U&>&& std::is_nothrow_assignable_v<T, const U&>)
+    std::is_nothrow_constructible_v<T, const U&> && std::is_nothrow_assignable_v<T, const U&>)
     requires(std::is_assignable_v<T, const U&> && std::is_constructible_v<T, const U&>)
   {
     if (m_engaged) {
