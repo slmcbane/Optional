@@ -78,22 +78,27 @@ Some(T& x) -> Some<T&>;
 template<class T>
 Some(const T& x) -> Some<const T&>;
 
-namespace optional_detail {
-template<class T>
-inline constexpr bool is_some = false;
-
-template<class T>
-inline constexpr bool is_some<Some<T>> = true;
-} // namespace optional_detail
-
 struct NoneType
 {};
 
 inline constexpr NoneType None;
 
+namespace optional_detail {
 template<class T>
-  requires(!std::is_same_v<T, NoneType> && !std::is_reference_v<T> &&
-           !optional_detail::is_some<T>)
+struct is_some : std::false_type
+{};
+
+template<class T>
+struct is_some<Some<T>> : std::true_type
+{};
+
+template<class T>
+concept AllowedOptional = std::negation_v<
+  std::disjunction<std::is_same<T, NoneType>, std::is_reference<T>, is_some<T>>>;
+
+} // namespace optional_detail
+
+template<optional_detail::AllowedOptional T>
 class Optional;
 
 namespace optional_detail {
@@ -135,9 +140,7 @@ constexpr inline bool returns_non_array_object =
 
 } // namespace optional_detail
 
-template<class T>
-  requires(!std::is_same_v<T, NoneType> && !std::is_reference_v<T> &&
-           !optional_detail::is_some<T>)
+template<optional_detail::AllowedOptional T>
 class Optional
 {
 public:
@@ -504,9 +507,7 @@ private:
   };
   bool m_engaged{ false };
 
-  template<class U>
-    requires(!std::is_same_v<U, NoneType> && !std::is_reference_v<U> &&
-             !optional_detail::is_some<T>)
+  template<optional_detail::AllowedOptional U>
   friend class Optional;
 
   template<class F, class U>
