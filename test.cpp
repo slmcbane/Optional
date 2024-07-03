@@ -85,3 +85,27 @@ static_assert(!is_trivially_copy_assignable_v<TriviallyCopyAndMoveConstructButNo
 static_assert(!is_trivially_move_assignable_v<TriviallyCopyAndMoveConstructButNotAssign>);
 static_assert(!is_trivially_copyable_v<TriviallyCopyAndMoveConstructButNotAssign>);
 
+/*
+ * constexpr tests
+ */
+
+void
+constexpr_test()
+{
+  constexpr Optional<int> optional = Some(10);
+  static_assert(optional.has_value());
+  static_assert((bool)optional);
+  static_assert(*optional == 10);
+  constexpr Optional<int> b = optional;
+  static_assert(*b == 10);
+  static_assert(b.has_value());
+  static_assert(optional.value_or(1) == 10);
+  static_assert(
+    optional.and_then([](const auto& arg) { return Optional(Some(arg * 2)); }).value() == 20);
+}
+
+int
+main()
+{
+  constexpr_test();
+}
