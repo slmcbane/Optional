@@ -435,7 +435,7 @@ public:
   constexpr Optional or_else(F&& f) const& noexcept(
     std::conjunction_v<std::is_nothrow_copy_constructible<T>, std::is_nothrow_invocable<F>>)
     requires std::conjunction_v<
-      std::is_same<optional_detail::bare_result_type<F, const T&>, Optional<T>>,
+      std::is_same<std::remove_cvref_t<std::invoke_result_t<F>>, Optional<T>>,
       std::is_copy_constructible<T>,
       std::is_invocable<F>>
   {
@@ -446,7 +446,7 @@ public:
   constexpr Optional or_else(F&& f) && noexcept(
     std::conjunction_v<std::is_nothrow_move_constructible<T>, std::is_nothrow_invocable<F>>)
     requires std::conjunction_v<
-      std::is_same<optional_detail::bare_result_type<F, T&&>, Optional<T>>,
+      std::is_same<std::remove_cvref_t<std::invoke_result_t<F>>, Optional<T>>,
       std::is_move_constructible<T>,
       std::is_invocable<F>>
   {
