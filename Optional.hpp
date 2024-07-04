@@ -72,18 +72,26 @@ private:
 template<class T>
 Some(T&& x) -> Some<T&&>;
 
+/*
+ * For non-const lvalue reference we construct a Some<const T&>, because the appropriate
+ * constructor for Optional is the one that invokes copy-construction on T.
+ */
 template<class T>
 Some(T& x) -> Some<const T&>;
 
 template<class T>
 Some(const T& x) -> Some<const T&>;
 
+/*
+ * Equivalent to std::nullopt_t and std::nullopt. I prefer to spell this as 'None'.
+ */
 struct NoneType
 {};
 
 inline constexpr NoneType None;
 
 namespace optional_detail {
+
 template<class T>
 struct is_some : std::false_type
 {};
@@ -92,6 +100,11 @@ template<class T>
 struct is_some<Some<T>> : std::true_type
 {};
 
+/*
+ * gcc errors saying requires clauses are different on the different declarations of Optional
+ * unless we wrap the conditions in a concept. Interestingly, clang accepts it without the
+ * concept.
+ */
 template<class T>
 concept AllowedOptional =
   std::negation_v<std::disjunction<std::is_same<T, NoneType>, is_some<T>>>;
@@ -103,6 +116,10 @@ class Optional;
 
 namespace optional_detail {
 
+/*
+ * These concepts are useful for defaulting copy/move assignment operators that should be
+ * trivial.
+ */
 template<class T>
 concept trivially_copy_assignable =
   std::is_trivially_copy_assignable_v<T> && std::is_trivially_copy_constructible_v<T> &&
@@ -119,6 +136,10 @@ constexpr inline bool is_optional = false;
 template<class T>
 constexpr inline bool is_optional<Optional<T>> = true;
 
+/*
+ * This concept is needed as a constraint on the comparison operators for non-optional type in
+ * order to avoid a circular concept evaluation.
+ */
 template<class T>
 concept NotOptional = !is_optional<std::remove_cvref_t<T>>;
 
@@ -136,11 +157,6 @@ maybe_invoke(F&& f, T&& arg, bool cond)
   }
 }
 
-template<class F, class T>
-constexpr inline bool returns_non_array_object =
-  !std::disjunction_v<std::is_reference<std::invoke_result_t<F, T>>,
-                      std::is_array<std::invoke_result_t<F, T>>>;
-
 } // namespace optional_detail
 
 template<optional_detail::AllowedOptional T>
@@ -150,6 +166,10 @@ public:
   constexpr Optional() noexcept = default;
   constexpr Optional(NoneType) noexcept {}
 
+  /*
+   * Note the use of requires to make copy/move construction/assignment trivial if T is
+   * trivially copy/move constructible/assignable.
+   */
   constexpr Optional(const Optional&) noexcept
     requires std::is_trivially_copy_constructible_v<T>
   = default;
@@ -177,7 +197,6 @@ public:
   template<class... Args>
   constexpr explicit Optional(std::in_place_t, Args&&... args) noexcept(
     std::is_nothrow_constructible_v<T, Args&&...>)
-    requires std::is_constructible_v<T, Args&&...>
     : m_payload(std::forward<Args>(args)...)
     , m_engaged{ true }
   {
@@ -185,7 +204,6 @@ public:
 
   template<class U>
   constexpr Optional(Some<const U&> x) noexcept(std::is_nothrow_constructible_v<T, const U&>)
-    requires std::is_constructible_v<T, const U&>
     : m_payload(x.unwrap())
     , m_engaged{ true }
   {
@@ -193,7 +211,6 @@ public:
 
   template<class U>
   constexpr Optional(Some<U&&> x) noexcept(std::is_nothrow_constructible_v<T, U&&>)
-    requires std::is_constructible_v<T, U&&>
     : m_payload(x.unwrap())
     , m_engaged{ true }
   {
@@ -204,7 +221,6 @@ public:
   = default;
 
   constexpr ~Optional() noexcept(std::is_nothrow_destructible_v<T>)
-    requires(!std::is_trivially_destructible_v<T>)
   {
     if (m_engaged) {
       m_payload.~T();
@@ -248,7 +264,6 @@ public:
   constexpr Optional& operator=(Optional&& other) noexcept(
     std::is_nothrow_move_assignable_v<T> && std::is_nothrow_move_constructible_v<T> &&
     std::is_nothrow_destructible_v<T>)
-    requires(!optional_detail::trivially_move_assignable<T>)
   {
     if (m_engaged && other.m_engaged) {
       m_payload = static_cast<T&&>(other.m_payload);
@@ -265,7 +280,6 @@ public:
   template<class U>
   constexpr Optional& operator=(Some<const U&> x) noexcept(
     std::is_nothrow_constructible_v<T, const U&> && std::is_nothrow_assignable_v<T, const U&>)
-    requires(std::is_assignable_v<T, const U&> && std::is_constructible_v<T, const U&>)
   {
     if (m_engaged) {
       m_payload = x.unwrap();
@@ -273,12 +287,12 @@ public:
       std::construct_at(&m_payload, x.unwrap());
       m_engaged = true;
     }
+    return *this;
   }
 
   template<class U>
   constexpr Optional& operator=(Some<U&&> x) noexcept(std::is_nothrow_constructible_v<T, U&&> &&
                                                       std::is_nothrow_assignable_v<T, U&&>)
-    requires(std::is_assignable_v<T, U &&> && std::is_constructible_v<T, U &&>)
   {
     if (m_engaged) {
       m_payload = x.unwrap();
@@ -286,6 +300,7 @@ public:
       std::construct_at(&m_payload, x.unwrap());
       m_engaged = true;
     }
+    return *this;
   }
 
   constexpr const T* operator->() const noexcept
@@ -356,7 +371,6 @@ public:
   constexpr T value_or(U&& default_value) const& noexcept(
     std::conjunction_v<std::is_nothrow_copy_constructible<T>,
                        std::is_nothrow_constructible<T, U&&>>)
-    requires std::constructible_from<T, U&&> && std::constructible_from<T, const T&>
   {
     return m_engaged ? m_payload : static_cast<T>(std::forward<U>(default_value));
   }
@@ -365,7 +379,6 @@ public:
   constexpr T value_or(U&& default_value) && noexcept(
     std::conjunction_v<std::is_nothrow_move_constructible<T>,
                        std::is_nothrow_constructible<T, U&&>>)
-    requires std::constructible_from<T, U&&> && std::constructible_from<T, T&&>
   {
     return m_engaged ? std::move(m_payload) : static_cast<T>(std::forward<U>(default_value));
   }
@@ -398,12 +411,16 @@ public:
     return optional_detail::maybe_invoke(std::forward<F>(f), std::move(m_payload), m_engaged);
   }
 
+  // TODO: Make sure to test this with the passed callable returning an r-value reference.
   template<class F>
   constexpr auto transform(F&& f) & noexcept(std::is_nothrow_invocable_v<F, T&>)
-    requires(!std::is_rvalue_reference_v<std::invoke_result_t<F, T&>>)
   {
     using result_type = std::invoke_result_t<F, T&>;
-    if constexpr (std::is_reference_v<result_type>) {
+    if constexpr (std::is_rvalue_reference_v<result_type>) {
+      return m_engaged
+               ? Optional<std::remove_cvref_t<result_type>>(std::forward<F>(f), m_payload)
+               : None;
+    } else if constexpr (std::is_reference_v<result_type>) {
       return m_engaged ? Optional(SomeRef(std::invoke(std::forward<F>(f), m_payload))) : None;
     } else {
       return m_engaged ? Optional<result_type>(std::forward<F>(f), m_payload) : None;
@@ -412,10 +429,13 @@ public:
 
   template<class F>
   constexpr auto transform(F&& f) const& noexcept(std::is_nothrow_invocable_v<F, const T&>)
-    requires(!std::is_rvalue_reference_v<std::invoke_result_t<F, const T&>>)
   {
     using result_type = std::invoke_result_t<F, const T&>;
-    if constexpr (std::is_reference_v<result_type>) {
+    if constexpr (std::is_rvalue_reference_v<result_type>) {
+      return m_engaged
+               ? Optional<std::remove_cvref_t<result_type>>(std::forward<F>(f), m_payload)
+               : None;
+    } else if constexpr (std::is_reference_v<result_type>) {
       return m_engaged ? Optional(SomeRef(std::invoke(std::forward<F>(f), m_payload))) : None;
     } else {
       return m_engaged ? Optional<result_type>(std::forward<F>(f), m_payload) : None;
@@ -424,10 +444,13 @@ public:
 
   template<class F>
   constexpr auto transform(F&& f) && noexcept(std::is_nothrow_invocable_v<F, T&&>)
-    requires(!std::is_rvalue_reference_v<std::invoke_result_t<F, T &&>>)
   {
     using result_type = std::invoke_result_t<F, T&&>;
-    if constexpr (std::is_reference_v<result_type>) {
+    if constexpr (std::is_rvalue_reference_v<result_type>) {
+      return m_engaged ? Optional<std::remove_cvref_t<result_type>>(std::forward<F>(f),
+                                                                    std::move(m_payload))
+                       : None;
+    } else if constexpr (std::is_reference_v<result_type>) {
       return m_engaged
                ? Optional(SomeRef(std::invoke(std::forward<F>(f), std::move(m_payload))))
                : None;
@@ -438,10 +461,13 @@ public:
 
   template<class F>
   constexpr auto transform(F&& f) const&& noexcept(std::is_nothrow_invocable_v<F, const T&&>)
-    requires(!std::is_rvalue_reference_v<std::invoke_result_t<F, const T &&>>)
   {
     using result_type = std::invoke_result_t<F, const T&&>;
-    if constexpr (std::is_reference_v<result_type>) {
+    if constexpr (std::is_rvalue_reference_v<result_type>) {
+      return m_engaged ? Optional<std::remove_cvref_t<result_type>>(std::forward<F>(f),
+                                                                    std::move(m_payload))
+                       : None;
+    } else if constexpr (std::is_reference_v<result_type>) {
       return m_engaged
                ? Optional(SomeRef(std::invoke(std::forward<F>(f), std::move(m_payload))))
                : None;
@@ -474,7 +500,6 @@ public:
 
   constexpr void swap(Optional& other) noexcept(
     std::conjunction_v<std::is_nothrow_move_constructible<T>, std::is_nothrow_swappable<T>>)
-    requires std::conjunction_v<std::is_move_constructible<T>, std::is_swappable<T>>
   {
     using std::swap;
     if (m_engaged) {
@@ -508,7 +533,6 @@ public:
   constexpr T& emplace(Args&&... args) noexcept(
     std::conjunction_v<std::is_nothrow_destructible<T>,
                        std::is_nothrow_constructible<T, Args&&...>>)
-    requires std::constructible_from<T, Args&&...>
   {
     reset();
     std::construct_at(&m_payload, std::forward<Args>(args)...);
@@ -528,14 +552,13 @@ private:
 
   template<class F, class U>
   constexpr explicit Optional(F&& f, U&& u) noexcept(std::is_nothrow_invocable_v<F, U&&>)
-    requires std::is_invocable_r_v<T, F, U>
     : m_payload(std::invoke(std::forward<F>(f), std::forward<U>(u)))
     , m_engaged{ true }
   {
   }
 };
 
-template<class T>
+template<optional_detail::AllowedOptional T>
 class Optional<T&>
 {
 public:
@@ -595,10 +618,12 @@ public:
 
   template<class F>
   constexpr auto transform(F&& f) const noexcept(std::is_nothrow_invocable_v<F, T&>)
-    requires(!std::is_rvalue_reference_v<std::invoke_result_t<F, T&>>)
   {
     using result_type = std::invoke_result_t<F, T&>;
-    if constexpr (std::is_reference_v<result_type>) {
+    if constexpr (std::is_rvalue_reference_v<result_type>) {
+      return m_ptr ? Optional<std::remove_cvref_t<result_type>>(std::forward<F>(f), *m_ptr)
+                   : None;
+    } else if constexpr (std::is_reference_v<result_type>) {
       return m_ptr ? Optional(SomeRef(std::invoke(std::forward<F>(f), *m_ptr))) : None;
     } else {
       return m_ptr ? Optional<result_type>(std::forward<F>(f), *m_ptr) : None;
@@ -686,6 +711,10 @@ operator<=>(const Optional<T>& a, const NoneType&) noexcept
   return a ? std::strong_ordering::greater : std::strong_ordering::equivalent;
 }
 
+/*
+ * Without the NotOptional constraint you get a circular evaluation of constraints
+ * from recursion in the standard lib.
+ */
 template<class T, optional_detail::NotOptional U>
   requires std::equality_comparable_with<T, U>
 inline constexpr bool
