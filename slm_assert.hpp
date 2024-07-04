@@ -62,6 +62,8 @@ check(bool condition,
     if constexpr (!std::is_constant_evaluated())                                               \
       assertions::check(                                                                       \
         condition, #condition, __func__, __FILE__, __LINE__ __VA_OPT__(, ) __VA_ARGS__);       \
+    else if (!condition)                                                                       \
+      *(volatile int*)nullptr = 0;                                                             \
   } while (0);
 
 #ifndef NDEBUG
