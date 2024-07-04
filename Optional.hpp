@@ -63,7 +63,7 @@ public:
 
   SomeRef(T&&) = delete;
 
-  T& unwrap() const noexcept { return m_ref; }
+  constexpr T& unwrap() const noexcept { return m_ref; }
 
 private:
   T& m_ref;
@@ -73,7 +73,7 @@ template<class T>
 Some(T&& x) -> Some<T&&>;
 
 template<class T>
-Some(T& x) -> Some<T&>;
+Some(T& x) -> Some<const T&>;
 
 template<class T>
 Some(const T& x) -> Some<const T&>;
@@ -93,8 +93,8 @@ struct is_some<Some<T>> : std::true_type
 {};
 
 template<class T>
-concept AllowedOptional = std::negation_v<
-  std::disjunction<std::is_same<T, NoneType>, std::is_reference<T>, is_some<T>>>;
+concept AllowedOptional =
+  std::negation_v<std::disjunction<std::is_same<T, NoneType>, is_some<T>>>;
 
 } // namespace optional_detail
 
@@ -631,6 +631,12 @@ Optional(Some<const T&>) -> Optional<T>;
 
 template<class T>
 Optional(Some<T&&>) -> Optional<T>;
+
+template<class T>
+Optional(SomeRef<T>) -> Optional<T&>;
+
+template<class T>
+Optional(SomeRef<const T>) -> Optional<const T&>;
 
 /******************************************************************************************
  * Comparison operators

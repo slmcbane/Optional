@@ -92,21 +92,62 @@ static_assert(!is_trivially_copyable_v<TriviallyCopyAndMoveConstructButNotAssign
 void
 constexpr_test()
 {
+  // Construction from Some
   constexpr Optional<int> optional = Some(10);
   static_assert(optional.has_value());
   static_assert((bool)optional);
   static_assert(*optional == 10);
+  // Copy assign
   constexpr Optional<int> b = optional;
   static_assert(*b == 10);
   static_assert(b.has_value());
+
+  // value_or
   static_assert(optional.value_or(1) == 10);
+  // and_then
   static_assert(
     optional.and_then([](const auto& arg) { return Optional(Some(arg * 2)); }).value() == 20);
   static_assert(*optional == 10);
 
-  static_assert(optional.transform([](int arg) -> double { return arg * 2; }).value() == 20);
-
+  // transform, compare to heterogeneous type
+  static_assert(optional.transform([](int arg) -> double { return arg * 2; }) == 20);
+  // or_else, compare to Optional
   static_assert(optional.or_else([]() -> Optional<int> { return Some(2); }) == optional);
+  // compare to nullopt
+  static_assert(optional != None);
+
+  // Ordering tests
+  static_assert(b < 20);
+  static_assert(b <= Optional(Some(20.0)));
+  static_assert(b > 9.8);
+  static_assert(b == Optional(Some(10)));
+  static_assert(b < b.transform([](auto arg) { return arg + 1; }));
+
+  constexpr auto lambda1 = []() {
+    Optional<int> opt = None;
+    int x = 2;
+    Optional opt2 = SomeRef(x);
+    *opt2 += 1;
+    opt = Some(*opt2);
+    return opt;
+  };
+
+  constexpr auto c = lambda1();
+  static_assert(c == 3);
+  static_assert(4 > c);
+  static_assert(None < c);
+  static_assert(c >= None);
+
+  constexpr auto lambda2 = []() -> Optional<int> {
+    int a = 1;
+    int b = 2;
+    Optional opt = SomeRef(b);
+    *opt *= 2;
+    opt = a;
+    *opt *= 2;
+    return Some(a + b);
+  };
+  static_assert(lambda2() == 6);
 }
 
 int
