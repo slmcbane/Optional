@@ -59,7 +59,7 @@ check(bool condition,
 
 #define REQUIRE(condition, ...)                                                                \
   do {                                                                                         \
-    if constexpr (!std::is_constant_evaluated())                                               \
+    if (!std::is_constant_evaluated())                                                         \
       assertions::check(                                                                       \
         condition, #condition, __func__, __FILE__, __LINE__ __VA_OPT__(, ) __VA_ARGS__);       \
     else if (!condition)                                                                       \
