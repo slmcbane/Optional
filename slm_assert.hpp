@@ -8,7 +8,6 @@ namespace slm {
 
 namespace assertions {
 
-#define UNLIKELY(x) __builtin_expect(x, 0)
 #define INLINE inline __attribute__((always_inline))
 #define NOT_INLINE __attribute__((noinline))
 
@@ -46,7 +45,7 @@ check(bool condition,
       int line,
       Args&&... args)
 {
-  if (UNLIKELY(!condition)) {
+  if (!condition) [[unlikely]] {
     if constexpr (sizeof...(Args) == 0) {
       simple_fail(condition_text, func, file, line);
     } else {
