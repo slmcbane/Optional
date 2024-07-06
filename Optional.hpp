@@ -170,11 +170,11 @@ public:
    * Note the use of requires to make copy/move construction/assignment trivial if T is
    * trivially copy/move constructible/assignable.
    */
-  constexpr Optional(const Optional&) noexcept
+  constexpr Optional(const Optional&)
     requires std::is_trivially_copy_constructible_v<T>
   = default;
 
-  constexpr Optional(const Optional& other) noexcept(std::is_nothrow_copy_constructible_v<T>)
+  constexpr Optional(const Optional& other)
   {
     if (other.m_engaged) {
       std::construct_at(&m_payload, other.m_payload);
@@ -195,8 +195,7 @@ public:
   }
 
   template<class... Args>
-  constexpr explicit Optional(std::in_place_t, Args&&... args) noexcept(
-    std::is_nothrow_constructible_v<T, Args&&...>)
+  constexpr explicit Optional(std::in_place_t, Args&&... args)
     : m_payload(std::forward<Args>(args)...)
     , m_engaged{ true }
   {
@@ -241,9 +240,7 @@ public:
     requires optional_detail::trivially_copy_assignable<T>
   = default;
 
-  constexpr Optional& operator=(const Optional& other) noexcept(
-    std::is_nothrow_copy_constructible_v<T> && std::is_nothrow_copy_assignable_v<T> &&
-    std::is_nothrow_destructible_v<T>)
+  constexpr Optional& operator=(const Optional& other)
   {
     if (m_engaged && other.m_engaged) {
       m_payload = other.m_payload;
@@ -278,8 +275,7 @@ public:
   }
 
   template<class U>
-  constexpr Optional& operator=(Some<const U&> x) noexcept(
-    std::is_nothrow_constructible_v<T, const U&> && std::is_nothrow_assignable_v<T, const U&>)
+  constexpr Optional& operator=(Some<const U&> x)
   {
     if (m_engaged) {
       m_payload = x.unwrap();
@@ -291,8 +287,7 @@ public:
   }
 
   template<class U>
-  constexpr Optional& operator=(Some<U&&> x) noexcept(std::is_nothrow_constructible_v<T, U&&> &&
-                                                      std::is_nothrow_assignable_v<T, U&&>)
+  constexpr Optional& operator=(Some<U&&> x)
   {
     if (m_engaged) {
       m_payload = x.unwrap();
@@ -343,69 +338,65 @@ public:
 
   constexpr bool has_value() const noexcept { return m_engaged; }
 
-  constexpr const T& value() const& noexcept
+  constexpr const T& value() const&
   {
     REQUIRE(m_engaged, "dereferencing disengaged Optional");
     return m_payload;
   }
 
-  constexpr T& value() & noexcept
+  constexpr T& value() &
   {
     REQUIRE(m_engaged, "dereferencing disengaged Optional");
     return m_payload;
   }
 
-  constexpr T&& value() && noexcept
+  constexpr T&& value() &&
   {
     REQUIRE(m_engaged, "dereferencing disengaged Optional");
     return static_cast<T&&>(m_payload);
   }
 
-  constexpr const T&& value() const&& noexcept
+  constexpr const T&& value() const&&
   {
     REQUIRE(m_engaged, "dereferencing disengaged Optional");
     return static_cast<const T&&>(m_payload);
   }
 
   template<class U>
-  constexpr T value_or(U&& default_value) const& noexcept(
-    std::conjunction_v<std::is_nothrow_copy_constructible<T>,
-                       std::is_nothrow_constructible<T, U&&>>)
+  constexpr T value_or(U&& default_value) const&
   {
     return m_engaged ? m_payload : static_cast<T>(std::forward<U>(default_value));
   }
 
   template<class U>
-  constexpr T value_or(U&& default_value) && noexcept(
-    std::conjunction_v<std::is_nothrow_move_constructible<T>,
-                       std::is_nothrow_constructible<T, U&&>>)
+  constexpr T value_or(U&& default_value) &&
   {
     return m_engaged ? std::move(m_payload) : static_cast<T>(std::forward<U>(default_value));
   }
 
   template<class F>
-  constexpr auto and_then(F&& f) & noexcept(std::is_nothrow_invocable_v<F, T&>)
+  constexpr auto and_then(F&& f) &
     requires optional_detail::is_optional<optional_detail::bare_result_type<F, T&>>
   {
     return optional_detail::maybe_invoke(std::forward<F>(f), m_payload, m_engaged);
   }
 
   template<class F>
-  constexpr auto and_then(F&& f) const& noexcept(std::is_nothrow_invocable_v<F, const T&>)
+  constexpr auto and_then(F&& f) const&
     requires optional_detail::is_optional<optional_detail::bare_result_type<F, const T&>>
   {
     return optional_detail::maybe_invoke(std::forward<F>(f), m_payload, m_engaged);
   }
 
   template<class F>
-  constexpr auto and_then(F&& f) && noexcept(std::is_nothrow_invocable_v<F, T&&>)
+  constexpr auto and_then(F&& f) &&
     requires optional_detail::is_optional<optional_detail::bare_result_type<F, T>>
   {
     return optional_detail::maybe_invoke(std::forward<F>(f), std::move(m_payload), m_engaged);
   }
 
   template<class F>
-  constexpr auto and_then(F&& f) const&& noexcept(std::is_nothrow_invocable_v<F, const T&&>)
+  constexpr auto and_then(F&& f) const&&
     requires optional_detail::is_optional<optional_detail::bare_result_type<F, const T>>
   {
     return optional_detail::maybe_invoke(std::forward<F>(f), std::move(m_payload), m_engaged);
@@ -413,7 +404,7 @@ public:
 
   // TODO: Make sure to test this with the passed callable returning an r-value reference.
   template<class F>
-  constexpr auto transform(F&& f) & noexcept(std::is_nothrow_invocable_v<F, T&>)
+  constexpr auto transform(F&& f) &
   {
     using result_type = std::invoke_result_t<F, T&>;
     if constexpr (std::is_rvalue_reference_v<result_type>) {
@@ -428,7 +419,7 @@ public:
   }
 
   template<class F>
-  constexpr auto transform(F&& f) const& noexcept(std::is_nothrow_invocable_v<F, const T&>)
+  constexpr auto transform(F&& f) const&
   {
     using result_type = std::invoke_result_t<F, const T&>;
     if constexpr (std::is_rvalue_reference_v<result_type>) {
@@ -443,7 +434,7 @@ public:
   }
 
   template<class F>
-  constexpr auto transform(F&& f) && noexcept(std::is_nothrow_invocable_v<F, T&&>)
+  constexpr auto transform(F&& f) &&
   {
     using result_type = std::invoke_result_t<F, T&&>;
     if constexpr (std::is_rvalue_reference_v<result_type>) {
@@ -460,7 +451,7 @@ public:
   }
 
   template<class F>
-  constexpr auto transform(F&& f) const&& noexcept(std::is_nothrow_invocable_v<F, const T&&>)
+  constexpr auto transform(F&& f) const&&
   {
     using result_type = std::invoke_result_t<F, const T&&>;
     if constexpr (std::is_rvalue_reference_v<result_type>) {
@@ -477,8 +468,7 @@ public:
   }
 
   template<class F>
-  constexpr Optional or_else(F&& f) const& noexcept(
-    std::conjunction_v<std::is_nothrow_copy_constructible<T>, std::is_nothrow_invocable<F>>)
+  constexpr Optional or_else(F&& f) const&
     requires std::conjunction_v<
       std::is_same<std::remove_cvref_t<std::invoke_result_t<F>>, Optional<T>>,
       std::is_copy_constructible<T>,
@@ -488,8 +478,7 @@ public:
   }
 
   template<class F>
-  constexpr Optional or_else(F&& f) && noexcept(
-    std::conjunction_v<std::is_nothrow_move_constructible<T>, std::is_nothrow_invocable<F>>)
+  constexpr Optional or_else(F&& f) &&
     requires std::conjunction_v<
       std::is_same<std::remove_cvref_t<std::invoke_result_t<F>>, Optional<T>>,
       std::is_move_constructible<T>,
@@ -530,9 +519,7 @@ public:
   }
 
   template<class... Args>
-  constexpr T& emplace(Args&&... args) noexcept(
-    std::conjunction_v<std::is_nothrow_destructible<T>,
-                       std::is_nothrow_constructible<T, Args&&...>>)
+  constexpr T& emplace(Args&&... args)
   {
     reset();
     std::construct_at(&m_payload, std::forward<Args>(args)...);
@@ -551,7 +538,7 @@ private:
   friend class Optional;
 
   template<class F, class U>
-  constexpr explicit Optional(F&& f, U&& u) noexcept(std::is_nothrow_invocable_v<F, U&&>)
+  constexpr explicit Optional(F&& f, U&& u)
     : m_payload(std::invoke(std::forward<F>(f), std::forward<U>(u)))
     , m_engaged{ true }
   {
@@ -562,9 +549,9 @@ template<optional_detail::AllowedOptional T>
 class Optional<T&>
 {
 public:
-  constexpr Optional() noexcept = default;
-  constexpr Optional(const Optional&) noexcept = default;
-  constexpr Optional(Optional&&) noexcept = default;
+  constexpr Optional() = default;
+  constexpr Optional(const Optional&) = default;
+  constexpr Optional(Optional&&) = default;
   constexpr Optional(NoneType) noexcept {}
 
   constexpr Optional(SomeRef<T> ref) noexcept
@@ -573,8 +560,8 @@ public:
   }
 
   constexpr Optional& operator=(NoneType) noexcept { m_ptr = nullptr; }
-  constexpr Optional& operator=(const Optional& other) noexcept = default;
-  constexpr Optional& operator=(Optional&& other) noexcept = default;
+  constexpr Optional& operator=(const Optional& other) = default;
+  constexpr Optional& operator=(Optional&& other) = default;
   constexpr Optional& operator=(SomeRef<T> ref) noexcept
   {
     m_ptr = &ref.unwrap();
@@ -609,7 +596,7 @@ public:
   }
 
   template<class F>
-  constexpr auto and_then(F&& f) const noexcept(std::is_nothrow_invocable_v<F, T&>)
+  constexpr auto and_then(F&& f) const
     requires optional_detail::is_optional<optional_detail::bare_result_type<F, T&>>
   {
     return m_ptr ? std::invoke(std::forward<F>(f), *m_ptr)
@@ -617,7 +604,7 @@ public:
   }
 
   template<class F>
-  constexpr auto transform(F&& f) const noexcept(std::is_nothrow_invocable_v<F, T&>)
+  constexpr auto transform(F&& f) const
   {
     using result_type = std::invoke_result_t<F, T&>;
     if constexpr (std::is_rvalue_reference_v<result_type>) {
@@ -631,7 +618,7 @@ public:
   }
 
   template<class F>
-  constexpr Optional or_else(F&& f) const noexcept(std::is_nothrow_invocable_v<F>)
+  constexpr Optional or_else(F&& f) const
     requires std::conjunction_v<
       std::is_same<optional_detail::bare_result_type<F, T&>, Optional<T&>>,
       std::is_invocable<F>>
@@ -669,7 +656,7 @@ Optional(SomeRef<const T>) -> Optional<const T&>;
 
 template<class T, std::equality_comparable_with<T> U>
 inline constexpr bool
-operator==(const Optional<T>& a, const Optional<U>& b) noexcept
+operator==(const Optional<T>& a, const Optional<U>& b)
 {
   if (a) {
     if (b) {
@@ -684,7 +671,7 @@ operator==(const Optional<T>& a, const Optional<U>& b) noexcept
 
 template<class T, std::three_way_comparable_with<T> U>
 inline constexpr std::compare_three_way_result_t<T, U>
-operator<=>(const Optional<T>& a, const Optional<U>& b) noexcept
+operator<=>(const Optional<T>& a, const Optional<U>& b)
 {
   if (a) {
     if (b) {
@@ -699,14 +686,14 @@ operator<=>(const Optional<T>& a, const Optional<U>& b) noexcept
 
 template<class T>
 inline constexpr bool
-operator==(const Optional<T>& a, const NoneType&) noexcept
+operator==(const Optional<T>& a, const NoneType&)
 {
   return !a;
 }
 
 template<class T>
 inline constexpr std::strong_ordering
-operator<=>(const Optional<T>& a, const NoneType&) noexcept
+operator<=>(const Optional<T>& a, const NoneType&)
 {
   return a ? std::strong_ordering::greater : std::strong_ordering::equivalent;
 }
@@ -718,7 +705,7 @@ operator<=>(const Optional<T>& a, const NoneType&) noexcept
 template<class T, optional_detail::NotOptional U>
   requires std::equality_comparable_with<T, U>
 inline constexpr bool
-operator==(const Optional<T>& a, const U& b) noexcept
+operator==(const Optional<T>& a, const U& b)
 {
   return a && *a == b;
 }
@@ -726,7 +713,7 @@ operator==(const Optional<T>& a, const U& b) noexcept
 template<class T, optional_detail::NotOptional U>
   requires std::three_way_comparable_with<T, U>
 inline constexpr std::compare_three_way_result_t<T, U>
-operator<=>(const Optional<T>& a, const U& b) noexcept
+operator<=>(const Optional<T>& a, const U& b)
 {
   if (a) {
     return *a <=> b;
