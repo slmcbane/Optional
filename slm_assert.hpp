@@ -43,13 +43,15 @@ fail_with_message(const char* condition_text,
 }
 
 template<class... Args>
-INLINE void
+INLINE constexpr void
 check(bool condition,
       const char* condition_text,
       const std::source_location& loc,
       Args&&... args)
 {
-  if (!condition) [[unlikely]] {
+  if (std::is_constant_evaluated() && !condition) {
+    *(volatile int*)nullptr = 0;
+  } else if (!condition) [[unlikely]] {
     if constexpr (sizeof...(Args) == 0) {
       simple_fail(condition_text, loc);
     } else {
@@ -61,11 +63,8 @@ check(bool condition,
 } // namespace assert
 
 #define REQUIRE(condition, ...)                                                                \
-  constexpr std::source_location loc = std::source_location::current();                        \
-  if (!std::is_constant_evaluated())                                                           \
-    assertions::check(condition, #condition, loc __VA_OPT__(, ) __VA_ARGS__);                  \
-  else if (!(condition))                                                                       \
-    *(volatile int*)nullptr = 0;
+  assertions::check(                                                                           \
+    condition, #condition, std::source_location::current() __VA_OPT__(, ) __VA_ARGS__);
 
 #ifndef NDEBUG
 #define CHECK(condition, ...) REQUIRE(condition __VA_OPT__(, ) __VA_ARGS__)
