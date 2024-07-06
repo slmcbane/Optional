@@ -342,25 +342,25 @@ public:
 
   constexpr bool has_value() const noexcept { return m_engaged; }
 
-  constexpr const T& value() const&
+  constexpr const T& value() const& noexcept
   {
     REQUIRE(m_engaged, "dereferencing disengaged Optional");
     return m_payload;
   }
 
-  constexpr T& value() &
+  constexpr T& value() & noexcept
   {
     REQUIRE(m_engaged, "dereferencing disengaged Optional");
     return m_payload;
   }
 
-  constexpr T&& value() &&
+  constexpr T&& value() && noexcept
   {
     REQUIRE(m_engaged, "dereferencing disengaged Optional");
     return static_cast<T&&>(m_payload);
   }
 
-  constexpr const T&& value() const&&
+  constexpr const T&& value() const&& noexcept
   {
     REQUIRE(m_engaged, "dereferencing disengaged Optional");
     return static_cast<const T&&>(m_payload);
@@ -590,7 +590,7 @@ public:
 
   constexpr bool has_value() const noexcept { return (bool)*this; }
 
-  constexpr T& value() const
+  constexpr T& value() const noexcept
   {
     REQUIRE(m_ptr, "Disengaged optional access");
     return *m_ptr;

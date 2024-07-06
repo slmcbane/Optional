@@ -13,7 +13,7 @@ namespace assertions {
 #define NOT_INLINE __attribute__((noinline))
 
 inline NOT_INLINE void
-simple_fail(const char* condition_text, const std::source_location& loc)
+simple_fail(const char* condition_text, const std::source_location& loc) noexcept
 {
   std::format_to(std::ostreambuf_iterator(std::cerr),
                  "Assertion error in {:s}:{:d}:{:s}: {:s}\n",
@@ -29,7 +29,7 @@ NOT_INLINE void
 fail_with_message(const char* condition_text,
                   const std::source_location& loc,
                   const char* msg_format,
-                  Args&&... args)
+                  Args&&... args) noexcept
 {
   auto msg = std::vformat(msg_format, std::make_format_args(args...));
   std::format_to(std::ostreambuf_iterator(std::cerr),
