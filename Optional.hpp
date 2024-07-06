@@ -174,7 +174,7 @@ public:
     requires std::is_trivially_copy_constructible_v<T>
   = default;
 
-  constexpr Optional(const Optional& other)
+  constexpr Optional(const Optional& other) noexcept(std::is_nothrow_copy_constructible_v<T>)
   {
     if (other.m_engaged) {
       std::construct_at(&m_payload, other.m_payload);
@@ -202,14 +202,14 @@ public:
   }
 
   template<class U>
-  constexpr Optional(Some<const U&> x) noexcept(std::is_nothrow_constructible_v<T, const U&>)
+  constexpr Optional(Some<const U&> x)
     : m_payload(x.unwrap())
     , m_engaged{ true }
   {
   }
 
   template<class U>
-  constexpr Optional(Some<U&&> x) noexcept(std::is_nothrow_constructible_v<T, U&&>)
+  constexpr Optional(Some<U&&> x)
     : m_payload(x.unwrap())
     , m_engaged{ true }
   {
@@ -226,7 +226,7 @@ public:
     }
   }
 
-  constexpr Optional& operator=(NoneType) noexcept
+  constexpr Optional& operator=(NoneType) noexcept(std::is_nothrow_destructible_v<T>)
   {
     if constexpr (!std::is_trivially_destructible_v<T>) {
       if (m_engaged) {
@@ -240,7 +240,10 @@ public:
     requires optional_detail::trivially_copy_assignable<T>
   = default;
 
-  constexpr Optional& operator=(const Optional& other)
+  constexpr Optional& operator=(const Optional& other) noexcept(
+    std::conjunction_v<std::is_nothrow_copy_constructible<T>,
+                       std::is_nothrow_copy_assignable<T>,
+                       std::is_nothrow_destructible<T>>)
   {
     if (m_engaged && other.m_engaged) {
       m_payload = other.m_payload;
@@ -259,8 +262,9 @@ public:
   = default;
 
   constexpr Optional& operator=(Optional&& other) noexcept(
-    std::is_nothrow_move_assignable_v<T> && std::is_nothrow_move_constructible_v<T> &&
-    std::is_nothrow_destructible_v<T>)
+    std::conjunction_v<std::is_nothrow_move_assignable<T>,
+                       std::is_nothrow_move_constructible<T>,
+                       std::is_nothrow_destructible<T>>)
   {
     if (m_engaged && other.m_engaged) {
       m_payload = static_cast<T&&>(other.m_payload);
@@ -488,7 +492,9 @@ public:
   }
 
   constexpr void swap(Optional& other) noexcept(
-    std::conjunction_v<std::is_nothrow_move_constructible<T>, std::is_nothrow_swappable<T>>)
+    std::conjunction_v<std::is_nothrow_move_constructible<T>,
+                       std::is_nothrow_swappable<T>,
+                       std::is_nothrow_destructible<T>>)
   {
     using std::swap;
     if (m_engaged) {
@@ -584,7 +590,7 @@ public:
 
   constexpr bool has_value() const noexcept { return (bool)*this; }
 
-  constexpr T& value() const noexcept
+  constexpr T& value() const
   {
     REQUIRE(m_ptr, "Disengaged optional access");
     return *m_ptr;
