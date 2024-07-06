@@ -163,7 +163,11 @@ template<optional_detail::AllowedOptional T>
 class Optional
 {
 public:
-  constexpr Optional() noexcept = default;
+  constexpr Optional() noexcept
+    : empty_{}
+  {
+  }
+
   constexpr Optional(NoneType) noexcept {}
 
   /*
@@ -534,8 +538,12 @@ public:
   }
 
 private:
+  struct Empty
+  {};
+
   union
   {
+    Empty empty_;
     T m_payload;
   };
   bool m_engaged{ false };
@@ -545,6 +553,7 @@ private:
 
   template<class F, class U>
   constexpr explicit Optional(F&& f, U&& u)
+    requires std::invocable<F&&, U&&>
     : m_payload(std::invoke(std::forward<F>(f), std::forward<U>(u)))
     , m_engaged{ true }
   {
