@@ -3,6 +3,7 @@
 
 #include <format>
 #include <iostream>
+#include <source_location>
 
 namespace slm {
 
@@ -12,27 +13,32 @@ namespace assertions {
 #define NOT_INLINE __attribute__((noinline))
 
 inline NOT_INLINE void
-simple_fail(const char* condition_text, const char* func, const char* file, int line)
+simple_fail(const char* condition_text, const std::source_location& loc)
 {
-  std::vformat_to(std::ostreambuf_iterator(std::cerr),
-                  "Assertion error in {:s}:{:d}:{:s}: {:s}\n",
-                  std::make_format_args(file, line, func, condition_text));
+  std::format_to(std::ostreambuf_iterator(std::cerr),
+                 "Assertion error in {:s}:{:d}:{:s}: {:s}\n",
+                 loc.file_name(),
+                 loc.line(),
+                 loc.function_name(),
+                 condition_text);
   std::abort();
 }
 
 template<class... Args>
 NOT_INLINE void
 fail_with_message(const char* condition_text,
-                  const char* func,
-                  const char* file,
-                  int line,
+                  const std::source_location& loc,
                   const char* msg_format,
                   Args&&... args)
 {
   auto msg = std::vformat(msg_format, std::make_format_args(args...));
-  std::vformat_to(std::ostreambuf_iterator(std::cerr),
-                  "Assertion error in {:s}:{:d}:{:s}: {:s}; message: {:s}\n",
-                  std::make_format_args(file, line, func, condition_text, msg));
+  std::format_to(std::ostreambuf_iterator(std::cerr),
+                 "Assertion error in {:s}:{:d}:{:s}: {:s}; message: {:s}\n",
+                 loc.file_name(),
+                 loc.line(),
+                 loc.function_name(),
+                 condition_text,
+                 msg);
   std::abort();
 }
 
@@ -40,16 +46,14 @@ template<class... Args>
 INLINE void
 check(bool condition,
       const char* condition_text,
-      const char* func,
-      const char* file,
-      int line,
+      const std::source_location& loc,
       Args&&... args)
 {
   if (!condition) [[unlikely]] {
     if constexpr (sizeof...(Args) == 0) {
-      simple_fail(condition_text, func, file, line);
+      simple_fail(condition_text, loc);
     } else {
-      fail_with_message(condition_text, func, file, line, std::forward<Args>(args)...);
+      fail_with_message(condition_text, loc, std::forward<Args>(args)...);
     }
   }
 }
@@ -57,13 +61,11 @@ check(bool condition,
 } // namespace assert
 
 #define REQUIRE(condition, ...)                                                                \
-  do {                                                                                         \
-    if (!std::is_constant_evaluated())                                                         \
-      assertions::check(                                                                       \
-        condition, #condition, __func__, __FILE__, __LINE__ __VA_OPT__(, ) __VA_ARGS__);       \
-    else if (!condition)                                                                       \
-      *(volatile int*)nullptr = 0;                                                             \
-  } while (0);
+  constexpr std::source_location loc = std::source_location::current();                        \
+  if (!std::is_constant_evaluated())                                                           \
+    assertions::check(condition, #condition, loc __VA_OPT__(, ) __VA_ARGS__);                  \
+  else if (!(condition))                                                                       \
+    *(volatile int*)nullptr = 0;
 
 #ifndef NDEBUG
 #define CHECK(condition, ...) REQUIRE(condition __VA_OPT__(, ) __VA_ARGS__)
