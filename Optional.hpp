@@ -238,6 +238,7 @@ public:
       }
     }
     m_engaged = false;
+    return *this;
   }
 
   constexpr Optional& operator=(const Optional&)
@@ -574,7 +575,11 @@ public:
   {
   }
 
-  constexpr Optional& operator=(NoneType) noexcept { m_ptr = nullptr; }
+  constexpr Optional& operator=(NoneType) noexcept
+  {
+    m_ptr = nullptr;
+    return *this;
+  }
   constexpr Optional& operator=(const Optional& other) = default;
   constexpr Optional& operator=(Optional&& other) = default;
   constexpr Optional& operator=(SomeRef<T> ref) noexcept
