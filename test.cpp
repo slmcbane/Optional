@@ -150,8 +150,160 @@ constexpr_test()
   static_assert(lambda2() == 6);
 }
 
+struct Int
+{
+  inline static size_t constructed = 0;
+  inline static size_t destroyed = 0;
+
+  int value;
+  enum Flags : int
+  {
+    DEFAULT_CONSTRUCTED = 0x1,
+    COPY_CONSTRUCTED = 0x2,
+    MOVE_CONSTRUCTED = 0x4,
+    VALUE_CONSTRUCTED = 0x8,
+    COPY_ASSIGNED = 0x10,
+    MOVE_ASSIGNED = 0x20,
+    COPIED_FROM = 0x40,
+    MOVED_FROM = 0x80,
+    VALUE_ASSIGNED = 0x100
+  };
+
+  mutable int flags = DEFAULT_CONSTRUCTED;
+
+  Int() { constructed++; }
+  Int(int x)
+    : value{ x }
+    , flags{ VALUE_CONSTRUCTED }
+  {
+    constructed++;
+  }
+  Int(const Int& other)
+    : value{ other.value }
+    , flags{ COPY_CONSTRUCTED }
+  {
+    constructed++;
+    other.flags |= COPIED_FROM;
+  }
+  Int(Int&& other)
+    : value{ other.value }
+    , flags{ MOVE_CONSTRUCTED }
+  {
+    constructed++;
+    other.flags |= MOVED_FROM;
+  }
+  Int& operator=(const Int& other)
+  {
+    flags |= COPY_ASSIGNED;
+    value = other.value;
+    other.flags |= COPIED_FROM;
+    return *this;
+  }
+  Int& operator=(Int&& other)
+  {
+    flags |= MOVE_ASSIGNED;
+    value = other.value;
+    other.flags |= MOVED_FROM;
+    return *this;
+  }
+  ~Int() { destroyed++; }
+  Int& operator=(int x)
+  {
+    flags |= VALUE_ASSIGNED;
+    value = x;
+    return *this;
+  }
+
+  bool operator==(const Int& other) const { return value == other.value; }
+  auto operator<=>(const Int& other) const { return value <=> other.value; }
+
+  friend Int operator+(const Int& a, const Int& b) { return a.value + b.value; }
+};
+
 int
 main()
 {
   constexpr_test();
+
+  {
+    Optional<Int> a = Some(1);
+    static_assert(!std::is_trivially_copy_constructible_v<Optional<Int>>);
+    REQUIRE(a.value() == 1);
+    REQUIRE(a == 1);
+    REQUIRE(*a == 1);
+    REQUIRE(a->flags & Int::VALUE_CONSTRUCTED);
+
+    Optional<Int> b = Some(*a);
+    REQUIRE(b.value() == 1);
+    REQUIRE(*b == 1);
+    REQUIRE(b->flags & Int::COPY_CONSTRUCTED);
+
+    Optional<Int> c = Some(std::move(b).value());
+    REQUIRE(c == 1);
+    REQUIRE(c->flags & Int::MOVE_CONSTRUCTED);
+    REQUIRE(b->flags & Int::MOVED_FROM);
+
+    Optional<Int> d = c;
+    REQUIRE(d < 2);
+    REQUIRE(d > None);
+    REQUIRE(d <= 3);
+    REQUIRE(d <= 1);
+    REQUIRE(d >= 1);
+    REQUIRE(None < d);
+    REQUIRE(d->flags & Int::COPY_CONSTRUCTED);
+
+    auto e = d.transform([](Int x) { return x + 1; });
+    static_assert(std::is_same_v<decltype(e), Optional<Int>>);
+    // Important: the result in 'transform' should be materialized directly into the optional.
+    REQUIRE(e->flags & Int::VALUE_CONSTRUCTED);
+    REQUIRE(e == 2);
+
+    Optional<Int> f = std::move(d);
+    REQUIRE(f == 1);
+    REQUIRE(d->flags & Int::MOVED_FROM);
+  }
+
+  {
+    Optional<Int> empty;
+    Optional<Int> a = Some(1);
+    auto b = (a = empty).and_then([](const Int& x) -> Optional<Int> { return Some(x + 1); });
+    REQUIRE(b == None);
+    REQUIRE(b >= None);
+    REQUIRE(b <= None);
+    REQUIRE(a == b);
+
+    Optional<Int> c = None;
+    REQUIRE(c == b);
+    Optional<Int> d(c);
+    REQUIRE(c == None);
+    Optional<Int> e(std::move(d));
+    REQUIRE(e == None);
+  }
+
+  {
+    Optional<Int> x(std::in_place, 5);
+    REQUIRE(x.has_value());
+    REQUIRE(*x == 5);
+    auto y = x.and_then([](auto v) -> Optional<Int> { return Some(v + 1); });
+    REQUIRE(y == 6);
+    REQUIRE(y->flags & Int::MOVE_CONSTRUCTED);
+    y = None;
+    REQUIRE(y == None);
+    REQUIRE(y != x);
+    y = x;
+    REQUIRE(y == 5);
+    REQUIRE(y->flags == Int::COPY_CONSTRUCTED);
+    auto z = (x = None).or_else([]() -> Optional<Int> { return Some(10); });
+    REQUIRE(z == 10);
+    y = z;
+    REQUIRE(y == 10);
+    REQUIRE(y == z);
+    REQUIRE(y != x);
+    REQUIRE(y != Optional<Int>(std::in_place, 9));
+  }
+
+  REQUIRE(Int::constructed == Int::destroyed,
+          "Constructed: {:d}; destroyed: {:d}",
+          Int::constructed,
+          Int::destroyed);
 }
