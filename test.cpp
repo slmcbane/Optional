@@ -220,6 +220,10 @@ struct Int
   friend Int operator+(const Int& a, const Int& b) { return a.value + b.value; }
 };
 
+constexpr auto const_detector = [](auto&& arg) -> Optional<std::string_view> {
+  return Some(is_const_v<std::remove_reference_t<decltype(arg)>> ? "const" : "not const");
+};
+
 int
 main()
 {
@@ -295,11 +299,87 @@ main()
     REQUIRE(y->flags == Int::COPY_CONSTRUCTED);
     auto z = (x = None).or_else([]() -> Optional<Int> { return Some(10); });
     REQUIRE(z == 10);
+    REQUIRE(z->flags == Int::VALUE_CONSTRUCTED);
     y = z;
     REQUIRE(y == 10);
+    REQUIRE(y->flags & Int::COPY_CONSTRUCTED);
     REQUIRE(y == z);
     REQUIRE(y != x);
     REQUIRE(y != Optional<Int>(std::in_place, 9));
+    REQUIRE(!x);
+
+    x = std::move(y);
+    REQUIRE(y.has_value());
+    REQUIRE(y->flags & Int::MOVED_FROM);
+    REQUIRE(x == 10);
+    z = std::move(x);
+    REQUIRE(x->flags & Int::MOVED_FROM);
+    REQUIRE(z->flags & Int::MOVE_ASSIGNED);
+    REQUIRE(z == 10);
+    x = y = None;
+    x = std::move(z);
+    REQUIRE(x->flags & Int::MOVE_CONSTRUCTED);
+
+    REQUIRE(x.and_then(const_detector) == "not const");
+    const Optional<Int> x2(x);
+    REQUIRE(x2.and_then(const_detector) == "const");
+    REQUIRE(x2->flags & Int::COPY_CONSTRUCTED);
+    REQUIRE(std::move(x).and_then(const_detector) == "not const");
+    REQUIRE(std::move(x2).and_then(const_detector) == "const");
+
+    x = y = None;
+    REQUIRE(!(x || y));
+    REQUIRE(x == y);
+    REQUIRE(x >= y);
+    REQUIRE(x <= y);
+    REQUIRE(z > x);
+    REQUIRE(z <= z);
+    REQUIRE(z >= z);
+    REQUIRE(z == z);
+    z = std::move(x);
+    REQUIRE(z == None);
+  }
+
+  {
+    Optional<Int> x = Some(2);
+    REQUIRE(x->flags & Int::VALUE_CONSTRUCTED);
+    x = Some(3);
+    REQUIRE(x == 3);
+    REQUIRE(x->flags & Int::VALUE_ASSIGNED);
+    x = None;
+    x = Some(4);
+    REQUIRE(x->flags & Int::VALUE_CONSTRUCTED);
+    REQUIRE(*x == 4);
+    Int y = 5;
+    x = Some(y);
+    REQUIRE(x == 5);
+    REQUIRE(x->flags & Int::COPY_ASSIGNED);
+    x = None;
+    x = Some(std::move(y));
+    REQUIRE(x == 5);
+    REQUIRE(x->flags & Int::MOVE_CONSTRUCTED);
+    REQUIRE(y.flags & Int::MOVED_FROM);
+    Optional<Int> z;
+    REQUIRE(!z);
+
+    z = Some(*x);
+    REQUIRE(z == 5);
+    REQUIRE(z->flags & Int::COPY_CONSTRUCTED);
+    z = None;
+
+    REQUIRE(Int(*(z.or_else([]() -> Optional<Int> { return Some(5); }))).flags &
+            Int::MOVE_CONSTRUCTED);
+
+    z = Some(1);
+    REQUIRE(Int(*(z.transform([](auto&& arg) -> Int { return arg + 1; }))).flags &
+            Int::MOVE_CONSTRUCTED);
+
+    constexpr auto helper = []() -> const Optional<Int> { return Some(5); };
+    REQUIRE(Int(*helper()).flags & Int::COPY_CONSTRUCTED);
+
+    REQUIRE(const_detector(*helper()) == "const");
+    REQUIRE(const_detector(helper().value()) == "const");
+    REQUIRE(const_detector(Optional(Some(*helper())).value()) == "not const");
   }
 
   REQUIRE(Int::constructed == Int::destroyed,
