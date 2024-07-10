@@ -665,6 +665,9 @@ template<class T>
 Optional(Some<T&&>) -> Optional<T>;
 
 template<class T>
+Optional(Some<const T&&>) -> Optional<T>;
+
+template<class T>
 Optional(SomeRef<T>) -> Optional<T&>;
 
 template<class T>
