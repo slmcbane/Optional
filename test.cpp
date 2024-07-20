@@ -395,6 +395,26 @@ main()
     REQUIRE(transformed2->flags & Int::MOVE_CONSTRUCTED);
   }
 
+  {
+    const Optional<Int> x(Some(1));
+    auto transformer = [](auto&& n) -> decltype(auto) { return n + 1; };
+    static_assert(std::is_same_v<std::invoke_result_t<decltype(transformer), const Int&>, Int>);
+    auto transformed = x.transform(transformer);
+    static_assert(std::is_same_v<decltype(transformed), Optional<Int>>);
+    REQUIRE(transformed->flags & Int::VALUE_CONSTRUCTED);
+
+    auto return_rvalue = [](auto&& n) -> decltype(auto) { return std::move(n); };
+    static_assert(
+      std::is_same_v<std::invoke_result_t<decltype(return_rvalue), const Int&>, const Int&&>);
+    auto transformed2 = x.transform(return_rvalue);
+    static_assert(std::is_same_v<decltype(transformed2), Optional<Int>>);
+    REQUIRE(transformed2->flags & Int::COPY_CONSTRUCTED);
+    REQUIRE(x == transformed2);
+    auto transformed3 = x.transform(std::identity{});
+    static_assert(std::is_same_v<decltype(transformed3), Optional<const Int&>>);
+    REQUIRE(transformed3.operator->() == x.operator->());
+  }
+
   REQUIRE(Int::constructed == Int::destroyed,
           "Constructed: {:d}; destroyed: {:d}",
           Int::constructed,
