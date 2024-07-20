@@ -413,6 +413,15 @@ main()
     auto transformed3 = x.transform(std::identity{});
     static_assert(std::is_same_v<decltype(transformed3), Optional<const Int&>>);
     REQUIRE(transformed3.operator->() == x.operator->());
+
+    transformed = std::move(x).transform(std::identity{});
+    REQUIRE(!(x->flags & Int::MOVED_FROM));
+    REQUIRE(transformed == x);
+    transformed3 = std::move(x).transform([](auto& arg) -> decltype(auto) { return arg; });
+    REQUIRE(transformed3 == x);
+    transformed2 = std::move(x).transform(transformer);
+    REQUIRE(*transformed2 == 2);
+    REQUIRE(transformed2->flags & Int::MOVE_ASSIGNED);
   }
 
   REQUIRE(Int::constructed == Int::destroyed,
