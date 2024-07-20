@@ -411,7 +411,6 @@ public:
     return optional_detail::maybe_invoke(std::forward<F>(f), std::move(m_payload), m_engaged);
   }
 
-  // TODO: Make sure to test this with the passed callable returning an r-value reference.
   template<class F>
   constexpr auto transform(F&& f) &
   {
@@ -421,7 +420,9 @@ public:
                ? Optional<std::remove_cvref_t<result_type>>(std::forward<F>(f), m_payload)
                : None;
     } else if constexpr (std::is_reference_v<result_type>) {
-      return m_engaged ? Optional(SomeRef(std::invoke(std::forward<F>(f), m_payload))) : None;
+      return m_engaged
+               ? Optional<result_type>(SomeRef(std::invoke(std::forward<F>(f), m_payload)))
+               : None;
     } else {
       return m_engaged ? Optional<result_type>(std::forward<F>(f), m_payload) : None;
     }
@@ -436,7 +437,9 @@ public:
                ? Optional<std::remove_cvref_t<result_type>>(std::forward<F>(f), m_payload)
                : None;
     } else if constexpr (std::is_reference_v<result_type>) {
-      return m_engaged ? Optional(SomeRef(std::invoke(std::forward<F>(f), m_payload))) : None;
+      return m_engaged
+               ? Optional<result_type>(SomeRef(std::invoke(std::forward<F>(f), m_payload)))
+               : None;
     } else {
       return m_engaged ? Optional<result_type>(std::forward<F>(f), m_payload) : None;
     }
@@ -451,9 +454,9 @@ public:
                                                                     std::move(m_payload))
                        : None;
     } else if constexpr (std::is_reference_v<result_type>) {
-      return m_engaged
-               ? Optional(SomeRef(std::invoke(std::forward<F>(f), std::move(m_payload))))
-               : None;
+      return m_engaged ? Optional<result_type>(
+                           SomeRef(std::invoke(std::forward<F>(f), std::move(m_payload))))
+                       : None;
     } else {
       return m_engaged ? Optional<result_type>(std::forward<F>(f), std::move(m_payload)) : None;
     }
@@ -468,9 +471,9 @@ public:
                                                                     std::move(m_payload))
                        : None;
     } else if constexpr (std::is_reference_v<result_type>) {
-      return m_engaged
-               ? Optional(SomeRef(std::invoke(std::forward<F>(f), std::move(m_payload))))
-               : None;
+      return m_engaged ? Optional<result_type>(
+                           SomeRef(std::invoke(std::forward<F>(f), std::move(m_payload))))
+                       : None;
     } else {
       return m_engaged ? Optional<result_type>(std::forward<F>(f), std::move(m_payload)) : None;
     }

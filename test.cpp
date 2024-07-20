@@ -382,6 +382,19 @@ main()
     REQUIRE(const_detector(Optional(Some(*helper())).value()) == "not const");
   }
 
+  {
+    Optional<Int> x(Some(1));
+    REQUIRE(x->flags & Int::VALUE_CONSTRUCTED);
+    auto moving_fn = [&](auto&&) -> decltype(auto) { return std::move(x); };
+    auto transformed = x.transform(moving_fn);
+    static_assert(std::is_same_v<decltype(transformed), Optional<Optional<Int>>>);
+    REQUIRE((*transformed)->flags & Int::MOVE_CONSTRUCTED);
+    auto transformed2 =
+      transformed.transform([](Optional<Int>& opt) -> decltype(auto) { return *opt; });
+    static_assert(std::is_same_v<decltype(transformed2), Optional<Int&>>);
+    REQUIRE(transformed2->flags & Int::MOVE_CONSTRUCTED);
+  }
+
   REQUIRE(Int::constructed == Int::destroyed,
           "Constructed: {:d}; destroyed: {:d}",
           Int::constructed,
