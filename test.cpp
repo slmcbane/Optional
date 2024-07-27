@@ -424,6 +424,54 @@ main()
     REQUIRE(transformed2->flags & Int::MOVE_ASSIGNED);
   }
 
+  {
+    Optional<Int&> x = None;
+    REQUIRE(!x.has_value());
+    Int y = 77;
+    Int z = 88;
+    REQUIRE(x.value_or(z) == z);
+    x = SomeRef(y);
+    REQUIRE(x.has_value() && x.value() == 77);
+    REQUIRE(x.value_or(z) == y);
+    REQUIRE(&x.value_or(z) == &y);
+
+    x = SomeRef(z);
+    REQUIRE(&x.value() == &z);
+    REQUIRE(x == z);
+    REQUIRE(x != y);
+    REQUIRE(y < x);
+    REQUIRE(None < x);
+    *x = 99;
+    REQUIRE(z == 99);
+
+    x = None;
+    REQUIRE(!x.has_value());
+    REQUIRE(z == 99 && y == 77);
+
+    {
+      auto result = x.and_then([](const Int& z) -> Optional<Int> { return Some(z + 1); });
+      REQUIRE(!result);
+      x = Optional<Int&>(SomeRef(z));
+      auto result2 = x.and_then([](Int& z) -> Optional<Int&> {
+        z = z + 1;
+        return SomeRef(z);
+      });
+      REQUIRE(z == 100);
+      REQUIRE(x == z);
+      REQUIRE(&(*x) == &(*result2));
+
+      // Referencing a variable in outer scope should work.
+      auto result3 = x.and_then([&](const Int&) -> Optional<const Int&> { return SomeRef(y); });
+      REQUIRE(result3 == y);
+      // Trying to reference a temporary should error.
+      /* result3 =
+        x.and_then([&](const Int& z) -> Optional<const Int&> { return SomeRef(z + 1); }); */
+    }
+
+    Optional<const Int&> x2 = x;
+    REQUIRE(&(*x2) == &(*x));
+  }
+
   REQUIRE(Int::constructed == Int::destroyed,
           "Constructed: {:d}; destroyed: {:d}",
           Int::constructed,

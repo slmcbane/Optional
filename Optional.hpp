@@ -578,6 +578,18 @@ public:
   {
   }
 
+  constexpr Optional(SomeRef<std::remove_const_t<T>> ref) noexcept
+    requires std::is_const_v<T>
+    : m_ptr{ &ref.unwrap() }
+  {
+  }
+
+  constexpr Optional(const Optional<std::remove_const_t<T>&>& other) noexcept
+    requires std::is_const_v<T>
+    : m_ptr{ other.m_ptr }
+  {
+  }
+
   constexpr Optional& operator=(NoneType) noexcept
   {
     m_ptr = nullptr;
@@ -655,6 +667,9 @@ public:
   constexpr void reset() noexcept { m_ptr = nullptr; }
 
 private:
+  template<optional_detail::AllowedOptional U>
+  friend class Optional;
+
   T* m_ptr{ nullptr };
 };
 
