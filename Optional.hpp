@@ -655,7 +655,9 @@ public:
   template<class F>
   constexpr Optional or_else(F&& f) const
     requires std::conjunction_v<
-      std::is_same<optional_detail::bare_result_type<F, T&>, Optional<T&>>,
+      std::disjunction<std::is_same<std::remove_cvref_t<std::invoke_result_t<F>>, Optional<T&>>,
+                       std::is_same<std::remove_cvref_t<std::invoke_result_t<F>>,
+                                    Optional<std::remove_const_t<T>&>>>,
       std::is_invocable<F>>
   {
     return m_ptr ? *this : std::invoke(std::forward<F>(f));

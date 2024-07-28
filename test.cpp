@@ -466,6 +466,31 @@ main()
       // Trying to reference a temporary should error.
       /* result3 =
         x.and_then([&](const Int& z) -> Optional<const Int&> { return SomeRef(z + 1); }); */
+      result3 = None;
+      REQUIRE(result3.value_or(*x) == x);
+      result3 = x;
+      REQUIRE(result3.transform([](const Int& x) { return x; })->flags & Int::COPY_CONSTRUCTED);
+      REQUIRE(Optional<const Int&>().transform(std::identity{}) == None);
+      REQUIRE(x.transform([](Int& z) -> decltype(auto) { return (z = z + 1); }) == x);
+      REQUIRE(x == 101);
+      REQUIRE(z == 101);
+      Optional<Int> a = x.transform([&z](Int& i) -> Int&& {
+        z = z + i;
+        return std::move(z);
+      });
+      REQUIRE(a->flags & Int::MOVE_CONSTRUCTED);
+      REQUIRE(a == 202);
+      REQUIRE(z.flags & Int::MOVED_FROM);
+
+      REQUIRE(x->flags & Int::MOVED_FROM);
+      x = SomeRef(*a);
+      REQUIRE(&(*x) == &(*a));
+
+      REQUIRE(x.or_else([]() { return Optional<Int&>(); }) == x);
+      result3 = None;
+      result3 = result3.or_else([&a]() -> Optional<Int&> { return SomeRef(*a); });
+      REQUIRE(result3 == a);
+      REQUIRE(&(*result3) == &(*a));
     }
 
     Optional<const Int&> x2 = x;
