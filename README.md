@@ -1,16 +1,17 @@
 # Optional
 Optionally, Optional replaces std::optional
 
-For my hobby projects, I wanted a nullable type that supports:
- * Optional references - I am convinced by the reasoning presented [in this article](https://thephd.dev/to-bind-and-loose-a-reference-optional). I want an Optional<T&> that rebinds on assignment. I hate writing optional<reference_wrapper<T>>.
- * Chaining via and_then. This will be in C++23 but I want it now (10/2022).
+For my own use, I wanted a nullable type that supports:
+ * Optional references - I hate writing optional<reference_wrapper<T>>. I find the reasons for not having this in the standard unconvincing.
+ * Support for C++23 monadic operations without requiring C++23 compiler support
  * No exceptions
 
-Besides the items above my goals are:
- * One to one correspondence with std::optional (except of course for reference types, and exceptions)
- * Code generation as efficient as std::optional
- * Fulfill all constexpr requirements in the C++20 standard
- * Have correct rebinding semantics for optionals containing std::pair or std::tuple with reference members
+In this project I also wanted to experiment with a couple of things:
+ * Cleaner implementation using C++20 concepts.
+ * Requiring explicit syntax to create an Optional - using my class you must do something like Optional<int> x = Some(1).
+
+I also aim to provide the same guarantees as far as trivial copyability, etc. as in the standard library, and satisfy all
+constexpr requirements from the C++20 standard. You should not be giving up any efficieny by using this over std::optional.
  
 # License
-Copyright 2022 by Sean McBane and released under the terms of the MIT License (see LICENSE for full statement).
+Copyright 2024 by Sean McBane and released under the terms of the MIT License (see LICENSE for full statement).
